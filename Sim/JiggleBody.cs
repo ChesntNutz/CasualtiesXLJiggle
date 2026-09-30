@@ -31,6 +31,7 @@ namespace CasualtiesJiggle
         private float _wobble; // weight-coupled global amplitude (0 at stage 0)
         private bool _wasGrounded = true;
         private float _airVelY;
+        private float _fallF; // fall state 0..1 (airborne + descending), fast attack / slow release
         private float _breathT;
         private float _lastDbg; // TEMPORARY 1 Hz tuning probe
 
@@ -160,6 +161,7 @@ namespace CasualtiesJiggle
                 _sPos *= 0.85f;
                 _sVel *= 0.85f;
                 _press *= 0.85f;
+                _fallF *= 0.85f;
                 return;
             }
 
@@ -270,6 +272,12 @@ namespace CasualtiesJiggle
                 _smoothAccel = Vector2.Lerp(_smoothAccel, raw, alpha);
             }
 
+            // --- fall state: airborne + descending fast enough to billow the belly up ---
+            float fallTarget =
+                !_body.grounded && v.y < -2f ? Mathf.Clamp01((-v.y - 2f) / 10f) : 0f;
+            float fallRate = fallTarget > _fallF ? 8f : 5f;
+            _fallF += (fallTarget - _fallF) * (1f - Mathf.Exp(-fallRate * dt));
+
             // --- wall press (WgPhysics RayIntersectSolid, adapted to sprites) ---
             ProbeWall(bt, dt);
 
@@ -280,12 +288,25 @@ namespace CasualtiesJiggle
             Vector2 accL = (Vector2)
                 bt.InverseTransformVector(new Vector3(_smoothAccel.x, _smoothAccel.y, 0f));
             float sagGain = JiggleConfig.GravitySag.Value * 0.045f * Mathf.Clamp(_wobble, 0f, 2.5f);
-            Vector2 rest = (gravL - accL) * (sagGain * JiggleConfig.InertiaGain.Value);
+            float sagMul = 1f - _fallF * JiggleConfig.FallSagFade.Value;
+            Vector2 rest =
+                (gravL - accL) * (sagGain * JiggleConfig.InertiaGain.Value * sagMul);
 
             float maxSq = JiggleConfig.MaxSquash.Value;
             float driveCap = maxSq * 0.5f;
             if (rest.sqrMagnitude > driveCap * driveCap)
                 rest = rest.normalized * driveCap;
+
+            Vector2 lift = Vector2.zero;
+            if (_fallF > 0.001f)
+            {
+                Vector2 upL =
+                    gravL.sqrMagnitude > 1e-10f ? -gravL.normalized : Vector2.up;
+                float wob4 = Mathf.Clamp(_wobble, 0f, 4f) / 4f;
+                lift = upL
+                    * (JiggleConfig.FallLift.Value * maxSq * wob4 * _fallF);
+                rest += lift;
+            }
 
             Vector2 wallAdd = Vector2.zero; // kept out of the soft body's drive (collision handles walls)
             if (_press > 0.001f && JiggleConfig.WallSquash.Value > 0f && belly != null)
@@ -450,14 +471,15 @@ namespace CasualtiesJiggle
                             + $" contacts={_bellyMesh.SoftContactsNow} pen={_bellyMesh.SoftPenNow:0.00} gated={_bellyMesh.SoftAlphaSkipped}"
                         : "\n  SOFT disabled (single-spring mesh mode)";
                 JigglePlugin.Log.LogInfo(
-                    $"[JiggleDbg] wobble={_wobble:0.00} grounded={_body.grounded} standing={_body.standing} press={_press:0.00}\n"
+                    $"[JiggleDbg] wobble={_wobble:0.00} grounded={_body.grounded} standing={_body.standing} press={_press:0.00} fall={_fallF:0.00} vy={v.y:0.00}\n"
                         + $"  pos={_sPos.ToString("0.000")} |pos|={posMag:0.000}/{maxSq:0.000}{(posMag >= maxSq * 0.99f ? " AT-CLAMP" : "")}"
                         + $" vel={_sVel.ToString("0.000")}\n"
                         + $"  rest={rest.ToString("0.000")} |rest|={restMag:0.000} (driveCap={driveCap:0.000} restCap={restCap:0.000}{(restMag >= restCap * 0.99f ? " REST-CAPPED" : "")})\n"
-                        + $"  gravityTerm={(gravL * (sagGain * JiggleConfig.InertiaGain.Value)).ToString("0.000")}"
-                        + $" accelTerm={(-accL * (sagGain * JiggleConfig.InertiaGain.Value)).ToString("0.000")}\n"
+                        + $"  gravityTerm={(gravL * (sagGain * JiggleConfig.InertiaGain.Value * sagMul)).ToString("0.000")}"
+                        + $" accelTerm={(-accL * (sagGain * JiggleConfig.InertiaGain.Value * sagMul)).ToString("0.000")}"
+                        + $" liftTerm={lift.ToString("0.000")}\n"
                         + $"  smoothAccel={_smoothAccel.ToString("0.0")} |a|={aMag:0.0}/{JiggleConfig.AccelClamp.Value:0}"
-                        + $" sagGain={sagGain:0.0000} InertiaGain={JiggleConfig.InertiaGain.Value:0.00}"
+                        + $" sagGain={sagGain:0.0000} sagMul={sagMul:0.00} InertiaGain={JiggleConfig.InertiaGain.Value:0.00}"
                         + meshInfo
                         + softInfo
                 );

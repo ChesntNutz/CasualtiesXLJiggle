@@ -16,6 +16,8 @@ namespace CasualtiesJiggle
         public static ConfigEntry<float> MaxOffset; // clamp on other limbs' share of the spring
         public static ConfigEntry<float> InertiaGain; // how strongly acceleration drives the spring vs gravity
         public static ConfigEntry<float> GravitySag; // constant downward droop multiplier
+        public static ConfigEntry<float> FallLift; // upward belly billow while falling
+        public static ConfigEntry<float> FallSagFade; // standing droop cancelled while falling
         public static ConfigEntry<float> AccelSmoothTime; // smoothing of the body acceleration input
         public static ConfigEntry<float> AccelClamp; // acceleration clamp (teleport/collision safety)
 
@@ -123,6 +125,24 @@ namespace CasualtiesJiggle
                 new ConfigDescription(
                     "Constant downward droop (belly sag) multiplier.",
                     new AcceptableValueRange<float>(0f, 5f)
+                )
+            );
+            FallLift = config.Bind(
+                "Springs",
+                "FallLift",
+                1.0f,
+                new ConfigDescription(
+                    "Upward belly billow while falling, full-weight-range scale. 0 = off. At stage 8 and full fall speed the belly rides ~MaxSquash up.",
+                    new AcceptableValueRange<float>(0f, 5f)
+                )
+            );
+            FallSagFade = config.Bind(
+                "Springs",
+                "FallSagFade",
+                1.0f,
+                new ConfigDescription(
+                    "How much of the standing droop is cancelled while falling (airborne, descending). 1 = weightless fall.",
+                    new AcceptableValueRange<float>(0f, 1f)
                 )
             );
             AccelSmoothTime = config.Bind(
