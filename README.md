@@ -20,4 +20,4 @@ THIS IS A HEAVILY EXPERIMENTAL MOD. It's far from finished and any feedback, pul
 
 - Expie's sprite gets glitched out when wedged in holes.
 - Expie's higher sizes may appear blockier in some scenarios. I'm working on trying to make him appear softer in these scenarios.
-- A ton of debug messages are being logged in the terminal; this was intentional as I keep tuning the values. A later update will make these messages toggleable.
+- Debug messages (mesh diagnostics, wobble/wall probes, etc.) are logged in the terminal while tuning the values. They are now toggleable via the `DebugEnabled` option in the `General` section of the BepInEx config (off by default; warnings and errors always show).
