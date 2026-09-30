@@ -12,10 +12,13 @@ namespace CasualtiesJiggle
         private MeshFilter _mf;
         private Mesh _mesh;
 
+        internal const float CollideAlphaMin = 0.04f;
+
         private Vector3[] _base;      // undeformed vertex positions (limb local space)
         private Vector2[] _u01;      // normalized position inside the sprite rect (x right, y up)
         private Vector2[] _uv;
         private float[] _w;          // belly-region falloff weight; 0 on the border ring
+        private float[] _vertA;      // per-vertex sprite alpha; collision only where visible
         private readonly List<Vector3> _verts = new List<Vector3>(256);
         private readonly List<Vector2> _uvs = new List<Vector2>(256);
         private readonly List<Vector3> _normals = new List<Vector3>(256);
@@ -32,6 +35,7 @@ namespace CasualtiesJiggle
         private Sprite _sprite;
         private Bounds _baseRect;        // bounds of the undeformed grid, for the wall probe
         private bool _warnedSpriteReenabled;
+        private bool _warnedUngatedCollision;
         private MaterialPropertyBlock _mpb;
 
         // @TODO: TEMPORARY tuning-probe outputs (remove after tuning):
@@ -161,6 +165,7 @@ namespace CasualtiesJiggle
                 _u01 = new Vector2[n];
                 _uv = new Vector2[n];
                 _w = new float[n];
+                _vertA = new float[n];
             }
 
             Vector3 mn = new Vector3(float.PositiveInfinity, float.PositiveInfinity, 0f);
@@ -300,6 +305,8 @@ namespace CasualtiesJiggle
                 _colBotExt = new float[bandN];
                 _colX = new float[bandN];
             }
+            for (int i = 0; i < _vertA.Length; i++)
+                _vertA[i] = 1f;
             try
             {
                 int px0 = Mathf.RoundToInt(r.x);
@@ -323,9 +330,9 @@ namespace CasualtiesJiggle
                     {
                         int fX = 0, bX = 0;
                         for (int x = pw - 1; x >= 0; x--)
-                            if (cols[x + y * pw].a > 0.04f) { fX = x + 1; break; }
+                            if (cols[x + y * pw].a > CollideAlphaMin) { fX = x + 1; break; }
                         for (int x = 0; x < pw; x++)
-                            if (cols[x + y * pw].a > 0.04f) { bX = x; break; }
+                            if (cols[x + y * pw].a > CollideAlphaMin) { bX = x; break; }
                         if (fX == 0)
                             continue; // fully transparent row
                         float fext = (fX - pivX) / ppu;
@@ -336,7 +343,7 @@ namespace CasualtiesJiggle
                         float botExt = (pivY - r.yMin - y) / ppu;
                         for (int x = bX; x < fX; x++)
                         {
-                            if (cols[x + y * pw].a <= 0.04f)
+                            if (cols[x + y * pw].a <= CollideAlphaMin)
                                 continue;
                             int colBand = Mathf.Clamp(x * (res + 1) / pw, 0, res);
                             if (botExt > _colBotExt[colBand])
@@ -353,6 +360,31 @@ namespace CasualtiesJiggle
                             BackRowY = (r.yMin + y - pivY) / ppu;
                         }
                     }
+                    // per-vertex alpha mask: gate collision on visible pixels (cols row 0 = bottom,
+                    // same orientation as v01)
+                    for (int iy = 0; iy <= res; iy++)
+                    {
+                        float v01 = (float)iy / res;
+                        int fy = Mathf.Clamp(Mathf.RoundToInt(v01 * (ph - 1)), 0, ph - 1);
+                        for (int ix = 0; ix <= res; ix++)
+                        {
+                            float u01 = (float)ix / res;
+                            int fx = Mathf.Clamp(Mathf.RoundToInt(u01 * (pw - 1)), 0, pw - 1);
+                            float a = 0f;
+                            for (int oy = 0; oy <= 1; oy++)
+                            {
+                                int py = Mathf.Min(fy + oy, ph - 1);
+                                for (int ox = 0; ox <= 1; ox++)
+                                {
+                                    int px = Mathf.Min(fx + ox, pw - 1);
+                                    float pa = cols[px + py * pw].a;
+                                    if (pa > a)
+                                        a = pa;
+                                }
+                            }
+                            _vertA[iy * (res + 1) + ix] = a;
+                        }
+                    }
                     if (front > 0f && back > 0f)
                     {
                         HasSilhouette = true;
@@ -363,7 +395,15 @@ namespace CasualtiesJiggle
             }
             catch
             {
-                // texture not readable — keep the rect fallback
+                // texture not readable — keep the rect fallback; collision stays ungated
+                for (int i = 0; i < _vertA.Length; i++)
+                    _vertA[i] = 1f;
+                if (!_warnedUngatedCollision)
+                {
+                    _warnedUngatedCollision = true;
+                    JigglePlugin.Log.LogWarning(
+                        $"[BellyMesh] sprite '{_sr.sprite.name}' texture is not readable — per-vertex alpha gate disabled, collision is ungated for this sprite.");
+                }
             }
 
             BuildSoftBody(res);

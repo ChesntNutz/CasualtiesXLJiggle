@@ -11,6 +11,11 @@ namespace CasualtiesJiggle
         private float _lastPen;
         private int _lastCN;
 
+        // @TODO: TEMPORARY tuning-probe outputs (remove after tuning):
+        public int SoftContactsNow => _lastCN;
+        public float SoftPenNow => _lastPen;
+        public int SoftAlphaSkipped { get; private set; }
+
         private const float OverflowGain = 1f; // overall strength
         private const float OverflowMax = 0.8f; // max offset, world units (8 px per unit ~= 6 px)
         private const float OverflowForward = 1f; // toward the wall
@@ -33,7 +38,7 @@ namespace CasualtiesJiggle
             for (int i = 0; i < _pt.Length; i++)
             {
                 _contact[i] = false;
-                if (_ptPinned[i] || _w[i] <= 0.02f)
+                if (_ptPinned[i] || _w[i] <= 0.02f || _vertA[i] < CollideAlphaMin)
                     continue;
                 Vector2 newWorld,
                     n;
@@ -52,6 +57,14 @@ namespace CasualtiesJiggle
                 _pt[i] = (Vector2)bt.InverseTransformPoint(new Vector3(newWorld.x, newWorld.y, 0f));
                 Vector2 vLocal = (Vector2)bt.InverseTransformVector(vWorld);
                 _ptLast[i] = _pt[i] - vLocal;
+                float cap = Mathf.Max(Profile.MaxDisp * 1.25f, 0.8f);
+                Vector2 dc = _pt[i] - _base2[i];
+                float cm = dc.magnitude;
+                if (cm > cap)
+                {
+                    _pt[i] = _base2[i] + dc / cm * cap;
+                    _ptLast[i] += (_pt[i] - _ptLast[i]) * 0.5f;
+                }
                 _contact[i] = true;
                 cSum += newWorld;
                 nSum += n;
@@ -104,7 +117,7 @@ namespace CasualtiesJiggle
             for (int i = 0; i < _pt.Length; i++)
             {
                 Vector2 goal = Vector2.zero;
-                if (has && !_ptPinned[i] && !_contact[i] && _w[i] > 0.02f)
+                if (has && !_ptPinned[i] && !_contact[i] && _w[i] > 0.02f && _vertA[i] >= CollideAlphaMin)
                 {
                     Vector2 wp = bt.TransformPoint(new Vector3(_pt[i].x, _pt[i].y, 0f));
                     float along = Vector2.Dot(wp - centroid, tangent);

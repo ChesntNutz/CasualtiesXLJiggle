@@ -447,6 +447,7 @@ namespace CasualtiesJiggle
                     JiggleConfig.SoftBody.Value && _bellyMesh != null && _bellyMesh.Valid
                         ? $"\n  SOFT maxDisp={_bellyMesh.SoftMaxDispNow:0.000}u ({_bellyMesh.SoftMaxDispNow * _bellyMesh.PixelsPerUnit:0.00}px)"
                             + $" maxVel={_bellyMesh.SoftMaxVelNow:0.0}u/s NaNresets={_bellyMesh.SoftNaNResets}"
+                            + $" contacts={_bellyMesh.SoftContactsNow} pen={_bellyMesh.SoftPenNow:0.00} gated={_bellyMesh.SoftAlphaSkipped}"
                         : "\n  SOFT disabled (single-spring mesh mode)";
                 JigglePlugin.Log.LogInfo(
                     $"[JiggleDbg] wobble={_wobble:0.00} grounded={_body.grounded} standing={_body.standing} press={_press:0.00}\n"

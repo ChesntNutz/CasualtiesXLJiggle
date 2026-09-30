@@ -215,7 +215,10 @@ namespace CasualtiesJiggle
                 Vector2 nw,
                     nn;
                 float pn;
-                if (ProbePoint(bt, org, _pt[i], 0.03f, out nw, out nn, out pn))
+                if (
+                    _vertA[i] >= CollideAlphaMin
+                    && ProbePoint(bt, org, _pt[i], 0.03f, out nw, out nn, out pn)
+                )
                     _pt[i] = _ptLast[i] = (Vector2)
                         bt.InverseTransformPoint(new Vector3(nw.x, nw.y, 0f));
             }
@@ -225,6 +228,7 @@ namespace CasualtiesJiggle
                 mv = 0f;
             Vector2 mean = Vector2.zero;
             int meanN = 0;
+            int gatedN = 0;
             for (int i = 0; i < _pt.Length; i++)
             {
                 Vector2 d = _pt[i] - _base2[i];
@@ -234,6 +238,8 @@ namespace CasualtiesJiggle
                 float vm = (_pt[i] - _ptLast[i]).magnitude / dt;
                 if (vm > mv)
                     mv = vm;
+                if (_vertA[i] < CollideAlphaMin && (_ptPinned[i] || _w[i] > 0.02f))
+                    gatedN++;
                 if (!_ptPinned[i] && _w[i] > 0.33f)
                 {
                     mean += d;
@@ -243,6 +249,7 @@ namespace CasualtiesJiggle
             SoftMaxDispNow = md;
             SoftMaxVelNow = mv;
             SoftMeanDisp = meanN > 0 ? mean / meanN : Vector2.zero;
+            SoftAlphaSkipped = gatedN;
         }
 
         public void SoftImpulse(Vector2 dirLocal, float amount)
