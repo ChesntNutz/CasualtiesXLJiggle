@@ -16,6 +16,8 @@ namespace CasualtiesJiggle
         public static ConfigEntry<float> MaxOffset; // clamp on other limbs' share of the spring
         public static ConfigEntry<float> InertiaGain; // how strongly acceleration drives the spring vs gravity
         public static ConfigEntry<float> GravitySag; // constant downward droop multiplier
+        public static ConfigEntry<float> FallLift; // upward belly billow while falling
+        public static ConfigEntry<float> FallSagFade; // standing droop cancelled while falling
         public static ConfigEntry<float> AccelSmoothTime; // smoothing of the body acceleration input
         public static ConfigEntry<float> AccelClamp; // acceleration clamp (teleport/collision safety)
 
@@ -60,6 +62,12 @@ namespace CasualtiesJiggle
                 "Enabled",
                 true,
                 "Master toggle. Restart not required, applies to new bodies."
+            );
+            DebugEnabled = config.Bind(
+                "General",
+                "DebugEnabled",
+                false,
+                "Verbose debug logging: mesh build diagnostics, weight maps, 'belly mesh built' info, and the 1 Hz wobble/wall probes ([JiggleDbg], [JiggleWallDbg]). Warnings and errors are always logged."
             );
             Intensity = config.Bind(
                 "General",
@@ -123,6 +131,24 @@ namespace CasualtiesJiggle
                 new ConfigDescription(
                     "Constant downward droop (belly sag) multiplier.",
                     new AcceptableValueRange<float>(0f, 5f)
+                )
+            );
+            FallLift = config.Bind(
+                "Springs",
+                "FallLift",
+                1.0f,
+                new ConfigDescription(
+                    "Upward belly billow while falling, full-weight-range scale. 0 = off. At stage 8 and full fall speed the belly rides ~MaxSquash up.",
+                    new AcceptableValueRange<float>(0f, 5f)
+                )
+            );
+            FallSagFade = config.Bind(
+                "Springs",
+                "FallSagFade",
+                1.0f,
+                new ConfigDescription(
+                    "How much of the standing droop is cancelled while falling (airborne, descending). 1 = weightless fall.",
+                    new AcceptableValueRange<float>(0f, 1f)
                 )
             );
             AccelSmoothTime = config.Bind(

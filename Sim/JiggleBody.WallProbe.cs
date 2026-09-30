@@ -80,7 +80,7 @@ namespace CasualtiesJiggle
             }
             if (bestSide != 0)
                 _pressSide = bestSide;
-            if (best > 0.35f && bestHit != null && Time.time - _lastPressLog > 5f)
+            if (JiggleConfig.DebugEnabled.Value && best > 0.35f && bestHit != null && Time.time - _lastPressLog > 5f)
             {
                 _lastPressLog = Time.time;
                 JigglePlugin.Log.LogInfo(
@@ -91,9 +91,15 @@ namespace CasualtiesJiggle
             float rate = best > _press ? 6f : 5f;
             _press += (best - _press) * (1f - Mathf.Exp(-rate * dt));
 
-            if (_press > 0.05f && Time.time - _lastWallDbg >= 1f)
+            bool phantom =
+                _press < 0.05f
+                && _bellyMesh != null
+                && _bellyMesh.Valid
+                && _bellyMesh.SoftContactsNow > 0;
+            if (JiggleConfig.DebugEnabled.Value && (_press > 0.05f || phantom) && Time.time - _lastWallDbg >= 1f)
             {
                 _lastWallDbg = Time.time;
+                string tag = phantom ? " PHANTOM CONTACT" : "";
                 float facing = _body.transform.localScale.x >= 0f ? 1f : -1f;
                 bool frontPress =
                     ((Vector2)bt.InverseTransformVector(new Vector3(_pressSide, 0f, 0f))).x > 0f;
@@ -113,7 +119,7 @@ namespace CasualtiesJiggle
                     bool away =
                         Mathf.Abs(soft.x) < 0.005f || Mathf.Sign(soft.x) != Mathf.Sign(_pressSide);
                     JigglePlugin.Log.LogInfo(
-                        $"[JiggleWallDbg] press={_press:0.00} side={_pressSide:+0;-0} facing={facing:+0;-0} "
+                        $"[JiggleWallDbg]{tag} press={_press:0.00} side={_pressSide:+0;-0} facing={facing:+0;-0} "
                             + $"softInterior.x={soft.x:0.000} springPos.x={_sPos.x:0.000} {sil} -> "
                             + (away ? "AWAY from wall (ok)" : "TOWARD the wall (BUG)")
                     );
@@ -124,7 +130,7 @@ namespace CasualtiesJiggle
                     bool away =
                         Mathf.Abs(woff.x) < 0.005f || Mathf.Sign(woff.x) != Mathf.Sign(_pressSide);
                     JigglePlugin.Log.LogInfo(
-                        $"[JiggleWallDbg] press={_press:0.00} side={_pressSide:+0;-0} facing={facing:+0;-0} "
+                        $"[JiggleWallDbg]{tag} press={_press:0.00} side={_pressSide:+0;-0} facing={facing:+0;-0} "
                             + $"springPos.x={_sPos.x:0.000} worldVertexOffset.x={woff.x:0.000} {sil} -> "
                             + (away ? "AWAY from wall (ok)" : "TOWARD the wall (BUG)")
                     );
