@@ -182,7 +182,7 @@ namespace CasualtiesJiggle
                 {
                     _bellyMesh = BellyMesh.Build(_body.limbs[_bellyIndex], SoftProfile.Belly);
                     _meshAttempted = true;
-                    if (_bellyMesh != null)
+                    if (_bellyMesh != null && JiggleConfig.DebugEnabled.Value)
                     {
                         Sprite built = _bellyMesh.CurrentSprite;
                         JigglePlugin.Log.LogInfo(
@@ -224,9 +224,12 @@ namespace CasualtiesJiggle
                     {
                         _chestMesh = BellyMesh.Build(_body.limbs[ci], SoftProfile.Chest);
                         if (_chestMesh != null)
-                            JigglePlugin.Log.LogInfo(
-                                $"[JiggleBody] chest mesh built on limb {ci}."
-                            );
+                        {
+                            if (JiggleConfig.DebugEnabled.Value)
+                                JigglePlugin.Log.LogInfo(
+                                    $"[JiggleBody] chest mesh built on limb {ci}."
+                                );
+                        }
                         else
                             _chestRetryAfter = Time.time + 10f;
                     }
@@ -454,7 +457,7 @@ namespace CasualtiesJiggle
                 );
             }
 
-            if (Time.time - _lastDbg >= 1f)
+            if (JiggleConfig.DebugEnabled.Value && Time.time - _lastDbg >= 1f)
             {
                 _lastDbg = Time.time;
                 float posMag = _sPos.magnitude;

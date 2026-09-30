@@ -413,43 +413,46 @@ namespace CasualtiesJiggle
             _sr.enabled = _stuck;   // the mesh renders the sprite from now on (unless stuck)
             _mr.enabled = !_stuck;
 
-            // TEMPORARY build-time diagnostics (remove after milestone-1 verification):
-            // sprite atlas UVs, pivot math (mesh base rect vs the SpriteRenderer's own
-            // localBounds), material/shader, sorting values, renderer bounds.
-            try
+            if (JiggleConfig.DebugEnabled.Value)
             {
-                string uvsTxt = (s.uv != null && s.uv.Length > 0)
-                    ? string.Join(" ", Array.ConvertAll(s.uv, u => u.ToString("0.###")))
-                    : "none";
-                Bounds slb = _sr.localBounds;
-                bool match = Mathf.Abs(slb.center.x - _baseRect.center.x) < 0.01f
-                          && Mathf.Abs(slb.center.y - _baseRect.center.y) < 0.01f
-                          && Mathf.Abs(slb.size.x - _baseRect.size.x) < 0.02f
-                          && Mathf.Abs(slb.size.y - _baseRect.size.y) < 0.02f;
-                string shaderName = _mr.sharedMaterial != null && _mr.sharedMaterial.shader != null
-                    ? _mr.sharedMaterial.shader.name : "null";
-                JigglePlugin.Log.LogInfo(
-                    "[BellyMesh] diag: sprite '" + s.name + "'" +
-                    " rect=(" + r.xMin.ToString("0.#") + "," + r.yMin.ToString("0.#") + " " + r.width.ToString("0.#") + "x" + r.height.ToString("0.#") + ")" +
-                    " tex=" + tex.width + "x" + tex.height +
-                    " ppu=" + ppu + " pivot=" + piv.ToString("0.###") + "\n" +
-                    "  sprite.uv=[" + uvsTxt + "]" +
-                    " meshUV[0]=" + _uv[0].ToString("0.###") + " meshUV[last]=" + _uv[_uv.Length - 1].ToString("0.###") + "\n" +
-                    "  sr.localBounds=" + slb.ToString("0.###") + " meshBase=" + _baseRect.ToString("0.###") +
-                    " pivotMathMatch=" + (match ? "yes" : "NO") + "\n" +
-                    "  material='" + (_mr.sharedMaterial != null ? _mr.sharedMaterial.name : "null") +
-                    "' shader='" + shaderName + "'\n" +
-                    "  sortingLayer='" + _mr.sortingLayerName + "' order=" + _mr.sortingOrder +
-                    " rendererBounds=" + _mr.bounds.ToString("0.##") + "\n" +
-                    "  texture plumbing: mat.HasProperty(_MainTex)=" + (mat != null && mat.HasProperty("_MainTex")) +
-                    " mat._MainTex=" + TexDesc(mat != null ? mat.GetTexture("_MainTex") : null) +
-                    " mpb._MainTex=" + TexDesc(_mpb.GetTexture("_MainTex")) +
-                    " mpb._RendererColor=" + ((mat != null && mat.HasProperty("_RendererColor")) ? _mpb.GetColor("_RendererColor").ToString() : "n/a") + "\n" +
-                    "  verts=" + _mesh.vertexCount + " tris=" + (_mesh.triangles.Length / 3) +
-                    " meshOnFilter=" + (_mf.sharedMesh == _mesh));
+                // TEMPORARY build-time diagnostics (remove after milestone-1 verification):
+                // sprite atlas UVs, pivot math (mesh base rect vs the SpriteRenderer's own
+                // localBounds), material/shader, sorting values, renderer bounds.
+                try
+                {
+                    string uvsTxt = (s.uv != null && s.uv.Length > 0)
+                        ? string.Join(" ", Array.ConvertAll(s.uv, u => u.ToString("0.###")))
+                        : "none";
+                    Bounds slb = _sr.localBounds;
+                    bool match = Mathf.Abs(slb.center.x - _baseRect.center.x) < 0.01f
+                              && Mathf.Abs(slb.center.y - _baseRect.center.y) < 0.01f
+                              && Mathf.Abs(slb.size.x - _baseRect.size.x) < 0.02f
+                              && Mathf.Abs(slb.size.y - _baseRect.size.y) < 0.02f;
+                    string shaderName = _mr.sharedMaterial != null && _mr.sharedMaterial.shader != null
+                        ? _mr.sharedMaterial.shader.name : "null";
+                    JigglePlugin.Log.LogInfo(
+                        "[BellyMesh] diag: sprite '" + s.name + "'" +
+                        " rect=(" + r.xMin.ToString("0.#") + "," + r.yMin.ToString("0.#") + " " + r.width.ToString("0.#") + "x" + r.height.ToString("0.#") + ")" +
+                        " tex=" + tex.width + "x" + tex.height +
+                        " ppu=" + ppu + " pivot=" + piv.ToString("0.###") + "\n" +
+                        "  sprite.uv=[" + uvsTxt + "]" +
+                        " meshUV[0]=" + _uv[0].ToString("0.###") + " meshUV[last]=" + _uv[_uv.Length - 1].ToString("0.###") + "\n" +
+                        "  sr.localBounds=" + slb.ToString("0.###") + " meshBase=" + _baseRect.ToString("0.###") +
+                        " pivotMathMatch=" + (match ? "yes" : "NO") + "\n" +
+                        "  material='" + (_mr.sharedMaterial != null ? _mr.sharedMaterial.name : "null") +
+                        "' shader='" + shaderName + "'\n" +
+                        "  sortingLayer='" + _mr.sortingLayerName + "' order=" + _mr.sortingOrder +
+                        " rendererBounds=" + _mr.bounds.ToString("0.##") + "\n" +
+                        "  texture plumbing: mat.HasProperty(_MainTex)=" + (mat != null && mat.HasProperty("_MainTex")) +
+                        " mat._MainTex=" + TexDesc(mat != null ? mat.GetTexture("_MainTex") : null) +
+                        " mpb._MainTex=" + TexDesc(_mpb.GetTexture("_MainTex")) +
+                        " mpb._RendererColor=" + ((mat != null && mat.HasProperty("_RendererColor")) ? _mpb.GetColor("_RendererColor").ToString() : "n/a") + "\n" +
+                        "  verts=" + _mesh.vertexCount + " tris=" + (_mesh.triangles.Length / 3) +
+                        " meshOnFilter=" + (_mf.sharedMesh == _mesh));
+                }
+                catch { }
+                DumpMap(res);
             }
-            catch { }
-            DumpMap(res);
             return true;
         }
 

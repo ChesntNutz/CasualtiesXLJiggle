@@ -80,7 +80,7 @@ namespace CasualtiesJiggle
             }
             if (bestSide != 0)
                 _pressSide = bestSide;
-            if (best > 0.35f && bestHit != null && Time.time - _lastPressLog > 5f)
+            if (JiggleConfig.DebugEnabled.Value && best > 0.35f && bestHit != null && Time.time - _lastPressLog > 5f)
             {
                 _lastPressLog = Time.time;
                 JigglePlugin.Log.LogInfo(
@@ -96,7 +96,7 @@ namespace CasualtiesJiggle
                 && _bellyMesh != null
                 && _bellyMesh.Valid
                 && _bellyMesh.SoftContactsNow > 0;
-            if ((_press > 0.05f || phantom) && Time.time - _lastWallDbg >= 1f)
+            if (JiggleConfig.DebugEnabled.Value && (_press > 0.05f || phantom) && Time.time - _lastWallDbg >= 1f)
             {
                 _lastWallDbg = Time.time;
                 string tag = phantom ? " PHANTOM CONTACT" : "";

@@ -63,6 +63,12 @@ namespace CasualtiesJiggle
                 true,
                 "Master toggle. Restart not required, applies to new bodies."
             );
+            DebugEnabled = config.Bind(
+                "General",
+                "DebugEnabled",
+                false,
+                "Verbose debug logging: mesh build diagnostics, weight maps, 'belly mesh built' info, and the 1 Hz wobble/wall probes ([JiggleDbg], [JiggleWallDbg]). Warnings and errors are always logged."
+            );
             Intensity = config.Bind(
                 "General",
                 "Intensity",
