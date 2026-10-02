@@ -36,6 +36,8 @@ namespace CasualtiesJiggle
         private float _breathT;
         private float _lastDbg; // TEMPORARY 1 Hz tuning probe
 
+        private float _lastFootstepTime = -1f;
+
         private static int _groundMask = -1;
 
         public static JiggleBody ForBody(Body body)
@@ -433,10 +435,15 @@ namespace CasualtiesJiggle
                 _sPos = Vector2.zero;
                 _sVel = Vector2.zero;
             }
-            if (_sPos.sqrMagnitude > maxSq * maxSq)
+            float sMag = _sPos.magnitude;
+            float sLim = SoftLimitMag(sMag, maxSq);
+            if (sLim < sMag)
             {
-                _sPos = _sPos.normalized * maxSq;
-                _sVel *= 0.6f;
+                Vector2 n = _sPos / sMag;
+                _sPos = n * sLim;
+                float vOut = Vector2.Dot(_sVel, n);
+                if (vOut > 0f)
+                    _sVel -= n * (vOut * Mathf.Clamp01((sMag - maxSq * 0.6f) / (maxSq * 0.4f)));
             }
 
             bool wasGrounded = _wasGrounded;
@@ -565,8 +572,10 @@ namespace CasualtiesJiggle
                     continue;
                 }
                 Vector2 off = (Vector2)wdisp * _share[i];
-                if (off.sqrMagnitude > maxOff * maxOff)
-                    off = off.normalized * maxOff;
+                float offMag = off.magnitude;
+                float offLim = SoftLimitMag(offMag, maxOff);
+                if (offLim < offMag)
+                    off *= offLim / offMag;
 
                 Transform t = l.transform;
                 Vector3 curPos = t.localPosition;
@@ -603,9 +612,23 @@ namespace CasualtiesJiggle
                 || !_body.grounded
             )
                 return;
+            if (Time.time - _lastFootstepTime < 0.1f)
+                return;
+            _lastFootstepTime = Time.time;
             float imp = 1.0f * Mathf.Min(_wobble, 2.5f) * JiggleConfig.FootstepImpulse.Value;
             _sVel += LocalDown() * imp;
             SoftImpulseAll(imp);
+        }
+
+        internal static float SoftLimitMag(float m, float max)
+        {
+            if (max <= 0f)
+                return 0f;
+            float knee = max * 0.6f;
+            if (m <= knee)
+                return m;
+            float span = max - knee;
+            return knee + span * (float)System.Math.Tanh((m - knee) / span);
         }
 
         public void OnJump()

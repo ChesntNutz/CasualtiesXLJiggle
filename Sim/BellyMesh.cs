@@ -26,6 +26,16 @@ namespace CasualtiesJiggle
         private readonly List<Color32> _colors = new List<Color32>(256);
         private readonly List<int> _tris = new List<int>(2048);
 
+        private const float RenderCellPx = 3f;
+        private const int MaxRenderSub = 4;
+        private int _res;
+        private int _sub = 1;
+        private int _rres;
+        private Vector3[] _rBase;
+        private Vector2[] _simD;
+        private Vector2[] _rowTmp;
+        private float[] _crW;
+
         private Limb Owner { get; set; }
         private SoftProfile Profile { get; set; }
         private float _rx, _ry, _rw, _rh, _rf, _bulge;   // region bulge, fetched from the profile
@@ -212,14 +222,41 @@ namespace CasualtiesJiggle
             }
             _baseRect = new Bounds((mn + mx) * 0.5f, mx - mn);
 
-            _tris.Clear();
-            for (int y = 0; y < res; y++)
+            _res = res;
+            _sub = Mathf.Clamp(
+                Mathf.CeilToInt(Mathf.Max(r.width, r.height) / res / RenderCellPx),
+                1,
+                MaxRenderSub
+            );
+            _rres = res * _sub;
+            int rStride = _rres + 1;
+            int rn = rStride * rStride;
+            if (_rBase == null || _rBase.Length != rn)
+                _rBase = new Vector3[rn];
+            if (_simD == null || _simD.Length != n)
+                _simD = new Vector2[n];
+            if (_rowTmp == null || _rowTmp.Length != (res + 1) * rStride)
+                _rowTmp = new Vector2[(res + 1) * rStride];
+            _crW = new float[_sub * 4];
+            for (int k = 0; k < _sub; k++)
             {
-                for (int x = 0; x < res; x++)
+                float t = (float)k / _sub;
+                float t2 = t * t;
+                float t3 = t2 * t;
+                _crW[k * 4] = 0.5f * (-t3 + 2f * t2 - t);
+                _crW[k * 4 + 1] = 0.5f * (3f * t3 - 5f * t2 + 2f);
+                _crW[k * 4 + 2] = 0.5f * (-3f * t3 + 4f * t2 + t);
+                _crW[k * 4 + 3] = 0.5f * (t3 - t2);
+            }
+
+            _tris.Clear();
+            for (int y = 0; y < _rres; y++)
+            {
+                for (int x = 0; x < _rres; x++)
                 {
-                    int a = y * (res + 1) + x;
+                    int a = y * rStride + x;
                     int b = a + 1;
-                    int c = a + res + 1;
+                    int c = a + rStride;
                     int d = c + 1;
                     // front side
                     _tris.Add(a); _tris.Add(c); _tris.Add(d);
@@ -240,13 +277,24 @@ namespace CasualtiesJiggle
                 _mesh.Clear();
             }
             _verts.Clear(); _uvs.Clear(); _normals.Clear(); _tangents.Clear(); _colors.Clear();
-            for (int i = 0; i < n; i++)
+            for (int iy = 0; iy <= _rres; iy++)
             {
-                _verts.Add(_base[i]);
-                _uvs.Add(_uv[i]);
-                _normals.Add(new Vector3(0f, 0f, -1f)); // what a SpriteRenderer quad provides
-                _tangents.Add(new Vector4(1f, 0f, 0f, 0f));
-                _colors.Add((Color32)_sr.color);   // what the SpriteRenderer would tint with
+                float v01 = (float)iy / _rres;
+                for (int ix = 0; ix <= _rres; ix++)
+                {
+                    float u01 = (float)ix / _rres;
+                    Vector3 rb = new Vector3(
+                        (r.xMin - piv.x + u01 * r.width) / ppu,
+                        (r.yMin - piv.y + v01 * r.height) / ppu, 0f);
+                    _rBase[iy * rStride + ix] = rb;
+                    _verts.Add(rb);
+                    _uvs.Add(new Vector2(
+                        (r.xMin + u01 * r.width) / tex.width,
+                        (r.yMin + v01 * r.height) / tex.height));
+                    _normals.Add(new Vector3(0f, 0f, -1f)); // what a SpriteRenderer quad provides
+                    _tangents.Add(new Vector4(1f, 0f, 0f, 0f));
+                    _colors.Add((Color32)_sr.color);   // what the SpriteRenderer would tint with
+                }
             }
             _mesh.SetVertices(_verts);
             _mesh.SetUVs(0, _uvs);
@@ -509,12 +557,13 @@ namespace CasualtiesJiggle
                     if (bulgeGain > 0f && Mathf.Abs(d.x) > 1e-5f && _w[i] > 0f)
                         by = Mathf.Abs(d.x) * bulgeGain * _w[i]
                             * Mathf.Clamp((_u01[i].y - _regionCenter.y) * invHSoft, -1f, 1f);
-                    _verts[i] = new Vector3(_base[i].x + d.x, _base[i].y + d.y + by, _base[i].z);
+                    _simD[i] = new Vector2(d.x, d.y + by);
                     float ds = d.sqrMagnitude;
                     if (ds > maxDs)
                         maxDs = ds;
                 }
                 LastMaxDisp = Mathf.Sqrt(maxDs);
+                WriteRenderVerts();
                 _mesh.SetVertices(_verts);
                 return;
             }
@@ -532,13 +581,70 @@ namespace CasualtiesJiggle
                 float ds = dx * dx + dy * dy;
                 if (ds > maxDispSqr)
                     maxDispSqr = ds;
-                _verts[i] = new Vector3(
-                    _base[i].x + dx,
-                    _base[i].y + dy,
-                    _base[i].z);
+                _simD[i] = new Vector2(dx, dy);
             }
             LastMaxDisp = Mathf.Sqrt(maxDispSqr);   // TEMPORARY tuning probe
+            WriteRenderVerts();
             _mesh.SetVertices(_verts);
+        }
+
+        private void WriteRenderVerts()
+        {
+            int sStride = _res + 1;
+            int rStride = _rres + 1;
+            if (_sub <= 1)
+            {
+                for (int i = 0; i < _rBase.Length; i++)
+                {
+                    Vector3 b = _rBase[i];
+                    _verts[i] = new Vector3(b.x + _simD[i].x, b.y + _simD[i].y, b.z);
+                }
+                return;
+            }
+            for (int j = 0; j <= _res; j++)
+            {
+                int srow = j * sStride;
+                int trow = j * rStride;
+                for (int rx = 0; rx <= _rres; rx++)
+                {
+                    int cx = rx / _sub;
+                    int k = rx - cx * _sub;
+                    if (k == 0)
+                    {
+                        _rowTmp[trow + rx] = _simD[srow + cx];
+                        continue;
+                    }
+                    int w = k * 4;
+                    _rowTmp[trow + rx] =
+                        _simD[srow + Mathf.Max(cx - 1, 0)] * _crW[w]
+                        + _simD[srow + cx] * _crW[w + 1]
+                        + _simD[srow + Mathf.Min(cx + 1, _res)] * _crW[w + 2]
+                        + _simD[srow + Mathf.Min(cx + 2, _res)] * _crW[w + 3];
+                }
+            }
+            for (int ry = 0; ry <= _rres; ry++)
+            {
+                int cy = ry / _sub;
+                int k = ry - cy * _sub;
+                int vrow = ry * rStride;
+                int r1 = cy * rStride;
+                int r0 = Mathf.Max(cy - 1, 0) * rStride;
+                int r2 = Mathf.Min(cy + 1, _res) * rStride;
+                int r3 = Mathf.Min(cy + 2, _res) * rStride;
+                int w = k * 4;
+                for (int rx = 0; rx <= _rres; rx++)
+                {
+                    Vector2 v =
+                        k == 0
+                            ? _rowTmp[r1 + rx]
+                            : _rowTmp[r0 + rx] * _crW[w]
+                                + _rowTmp[r1 + rx] * _crW[w + 1]
+                                + _rowTmp[r2 + rx] * _crW[w + 2]
+                                + _rowTmp[r3 + rx] * _crW[w + 3];
+                    Vector3 b = _rBase[vrow + rx];
+                    _verts[vrow + rx] = new Vector3(b.x + v.x, b.y + v.y, b.z);
+                }
+            }
         }
 
         public void Restore()
